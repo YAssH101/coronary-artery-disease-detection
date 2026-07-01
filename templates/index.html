@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CardioAI — CAD Diagnostic System</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}" />
+</head>
+<body>
+<div class="app">
+
+  <!-- ── Titlebar ─────────────────────────────────────── -->
+  <header class="titlebar">
+    <div class="titlebar-brand">
+      <svg width="20" height="20" viewBox="0 0 32 32" fill="none">
+        <path d="M6 16h4l3-8 4 16 3-10 2 4 2-2h2" stroke="#0ea5e9" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="brand-name">CardioAI</span>
+      <span class="brand-sep">|</span>
+      <span class="brand-sub">Diagnostic Imaging System</span>
+    </div>
+    <div class="titlebar-center">
+      CORONARY ARTERY DISEASE DETECTION &nbsp;·&nbsp; CARDIAC MRI ANALYSIS
+    </div>
+    <div class="titlebar-right">
+      <div class="sys-indicator">
+        <div class="ind-dot" id="modelDot"></div>
+        <span id="modelStatus">Initialising…</span>
+      </div>
+      <div class="sys-indicator">
+        <div class="ind-dot ind-blue"></div>
+        <span>EfficientNet-B0</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Workspace ────────────────────────────────────── -->
+  <div class="workspace">
+
+    <!-- LEFT — Study Browser -->
+    <aside class="panel study-panel">
+      <div class="panel-hdr">
+        <span class="panel-title">STUDY BROWSER</span>
+        <span class="panel-badge" id="sliceBadgeCount" hidden>0</span>
+      </div>
+
+      <!-- Drop zone -->
+      <div class="p-section">
+        <div class="drop-zone" id="dropZone">
+          <svg width="32" height="32" viewBox="0 0 48 48" fill="none">
+            <rect x="4" y="10" width="40" height="30" rx="3" stroke="#3d5a75" stroke-width="1.5"/>
+            <path d="M14 30l7-9 5 6 4-5 5 8" stroke="#3d5a75" stroke-width="1.5"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="34" cy="20" r="3" fill="#3d5a75"/>
+          </svg>
+          <p class="drop-main">Drop patient folder here</p>
+          <p class="drop-sub">JPG · PNG · BMP &nbsp;|&nbsp; Folder or individual files</p>
+          <div class="browse-row">
+            <label class="btn-browse" for="folderInput">Browse Folder</label>
+            <label class="btn-browse btn-browse--sec" for="fileInput">Browse Files</label>
+          </div>
+          <input type="file" id="folderInput" webkitdirectory multiple hidden />
+          <input type="file" id="fileInput" accept=".jpg,.jpeg,.png,.bmp" multiple hidden />
+        </div>
+      </div>
+
+      <!-- File list -->
+      <div class="p-section p-section--grow" id="fileListSection" hidden>
+        <div class="section-label">
+          <span>SERIES</span>
+          <span id="fileCountLabel">0 slices</span>
+        </div>
+        <div class="file-list" id="fileList"></div>
+      </div>
+
+      <!-- Actions -->
+      <div class="p-section study-actions">
+        <button class="btn-analyse" id="analyseBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.5" stroke-linecap="round"><circle cx="11" cy="11" r="8"/>
+            <path d="m21 21-4.35-4.35"/></svg>
+          <span id="btnText">ANALYSE STUDY</span>
+          <span id="btnSpinner" class="spinner" hidden></span>
+        </button>
+        <button class="btn-clear" id="clearBtn" hidden>CLEAR STUDY</button>
+      </div>
+    </aside>
+
+    <!-- CENTER — Image Viewer -->
+    <main class="panel viewer-panel">
+      <div class="panel-hdr viewer-hdr">
+        <span class="panel-title">IMAGE VIEWER</span>
+        <div class="viewer-toolbar">
+          <button class="tool-btn" id="prevBtn" disabled title="Previous (←)">&#8249;</button>
+          <span class="slide-counter" id="slideCounter">— / —</span>
+          <button class="tool-btn" id="nextBtn" disabled title="Next (→)">&#8250;</button>
+          <div class="tool-sep"></div>
+          <button class="tool-btn tool-btn--text" id="autoPlayBtn" disabled title="Auto-play">&#9654; PLAY</button>
+          <div class="tool-sep"></div>
+          <button class="tool-btn tool-btn--text" id="heatmapBtn" disabled title="Grad-CAM heatmap">HEATMAP</button>
+        </div>
+      </div>
+
+      <!-- Viewer body -->
+      <div class="viewer-body">
+        <!-- Placeholder -->
+        <div class="viewer-placeholder" id="viewerPlaceholder">
+          <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+            <rect x="8" y="12" width="48" height="40" rx="4" stroke="#1e3a5f" stroke-width="2"/>
+            <path d="M20 38l8-10 6 7 5-6 6 9" stroke="#1e3a5f" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="42" cy="26" r="4" fill="#1e3a5f"/>
+          </svg>
+          <p>Load a study to begin</p>
+          <p class="placeholder-sub">Select cardiac MRI slices from the Study Browser</p>
+        </div>
+
+        <!-- Stage -->
+        <div class="slide-stage" id="slideStage" hidden>
+          <img id="slideImg" src="" alt="MRI slice" />
+          <!-- Overlays -->
+          <div class="img-overlay">
+            <div class="ovl ovl-tl">
+              <span class="ovl-label">CARDIOAI PACS</span>
+              <span class="ovl-val" id="ovlFilename">—</span>
+            </div>
+            <div class="ovl ovl-tr" id="sliceResultBadge" hidden></div>
+            <div class="ovl ovl-bl">
+              <span class="ovl-label">MODALITY</span>
+              <span class="ovl-val">CARDIAC MRI</span>
+            </div>
+            <div class="ovl ovl-br">
+              <span class="ovl-label">SLICE</span>
+              <span class="ovl-val" id="ovlCounter">—</span>
+            </div>
+          </div>
+          <!-- Crosshair grid -->
+          <div class="crosshair-h"></div>
+          <div class="crosshair-v"></div>
+          <!-- Heatmap loading overlay -->
+          <div class="heatmap-loading" id="heatmapLoading" hidden>
+            <div class="hm-spinner"></div>
+            <span>Computing Grad-CAM…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thumbnail strip -->
+      <div class="thumb-bar" id="thumbBar" hidden>
+        <div class="thumb-strip" id="thumbStrip"></div>
+      </div>
+    </main>
+
+    <!-- RIGHT — Analysis Panel -->
+    <aside class="panel analysis-panel">
+      <div class="panel-hdr">
+        <span class="panel-title">ANALYSIS REPORT</span>
+        <span class="panel-tag" id="reportTag" hidden>COMPLETE</span>
+      </div>
+
+      <div class="analysis-scroll">
+
+      <!-- Placeholder -->
+      <div class="analysis-placeholder" id="analysisPlaceholder">
+        <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+          <path d="M8 20h6l4-10 5 20 4-12 2 4 2-2h3" stroke="#1e3a5f" stroke-width="1.8"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <p>Awaiting analysis</p>
+        <p class="placeholder-sub">Results will appear here after processing</p>
+      </div>
+
+      <!-- Results -->
+      <div id="resultCard" hidden>
+
+        <!-- Diagnosis header -->
+        <div class="diag-header" id="diagHeader">
+          <div class="diag-icon" id="diagIcon"></div>
+          <div class="diag-text">
+            <div class="diag-label" id="diagLabel">—</div>
+            <div class="diag-risk"  id="diagRisk">—</div>
+          </div>
+        </div>
+
+        <!-- Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <div class="metric-val" id="metricConfidence">—</div>
+            <div class="metric-label">CONFIDENCE</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-val" id="metricSlices">—</div>
+            <div class="metric-label">TOTAL SLICES</div>
+          </div>
+          <div class="metric-box metric-box--sick">
+            <div class="metric-val" id="metricCad">—</div>
+            <div class="metric-label">CAD SLICES</div>
+          </div>
+          <div class="metric-box metric-box--normal">
+            <div class="metric-val" id="metricNormal">—</div>
+            <div class="metric-label">NORMAL SLICES</div>
+          </div>
+        </div>
+
+        <!-- Probability gauges -->
+        <div class="gauge-section">
+          <div class="gauge-label-row">
+            <span>CAD PROBABILITY</span>
+            <span class="gauge-val" id="probSick">—</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-fill gauge-sick" id="barSick" style="width:0%"></div></div>
+
+          <div class="gauge-label-row">
+            <span>NORMAL PROBABILITY</span>
+            <span class="gauge-val" id="probNormal">—</span>
+          </div>
+          <div class="gauge-track"><div class="gauge-fill gauge-normal" id="barNormal" style="width:0%"></div></div>
+        </div>
+
+        <!-- Slice breakdown -->
+        <div class="breakdown-section">
+          <div class="section-label">
+            <span>SLICE BREAKDOWN</span>
+          </div>
+          <div class="breakdown-list" id="perSliceList"></div>
+        </div>
+
+        <!-- Disclaimer -->
+        <div class="disclaimer">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2"><circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+          FOR RESEARCH USE ONLY — NOT FOR CLINICAL DIAGNOSIS
+        </div>
+      </div>
+
+      <!-- Error -->
+      <div class="error-panel" id="errorCard" hidden>
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2"><circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="errorMsg"></span>
+      </div>
+
+      </div><!-- /analysis-scroll -->
+    </aside>
+
+  </div><!-- /workspace -->
+
+  <!-- ── Status bar ────────────────────────────────────── -->
+  <footer class="statusbar">
+    <span id="sbModel">● Model: checking…</span>
+    <span class="sb-sep"></span>
+    <span id="sbStudy">No study loaded</span>
+    <span class="sb-sep"></span>
+    <span id="sbSlice">—</span>
+    <div class="sb-right">
+      <span>EfficientNet-B0 &nbsp;·&nbsp; PyTorch</span>
+      <span class="sb-sep"></span>
+      <span>CardioAI v1.0 &nbsp;·&nbsp; Research Use Only</span>
+    </div>
+  </footer>
+
+</div><!-- /app -->
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
