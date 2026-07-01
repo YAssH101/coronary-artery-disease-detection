@@ -56,12 +56,14 @@ Patient-level stratified split — no patient appears in more than one split:
 
 | Metric | Score |
 |---|---|
-| Accuracy | — |
-| Sensitivity (Recall) | — |
-| Specificity | — |
-| Precision | — |
-| F1 Score | — |
-| ROC AUC | — |
+| Accuracy | 73.8% |
+| Sensitivity (Recall) | 66.7% |
+| Specificity | 77.6% |
+| Precision | 61.6% |
+| F1 Score | 64.0% |
+| ROC AUC | **0.81** |
+
+Trained on Colab A100 with patient-level split and CLAHE preprocessing.
 
 *Evaluation plots saved to `static/`: `confusion_matrix.png`, `roc_pr_curves.png`, `training_history.png`*
 
@@ -95,6 +97,14 @@ Patient-level stratified split — no patient appears in more than one split:
 ```bash
 pip install -r requirements.txt
 ```
+
+**Download model weights** — `model/cad_model.pth` is not tracked in git (too large). After training on Kaggle/Colab, download the `.pth` file and place it at:
+
+```
+model/cad_model.pth
+```
+
+The app will warn you at startup if the file is missing.
 
 Place the dataset at `C:\Users\<you>\Downloads\dataset` with `Normal\` and `Sick\` subdirectories, or update `DATASET_PATH` in `train.py` and `evaluate.py`.
 
